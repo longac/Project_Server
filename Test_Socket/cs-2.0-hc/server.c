@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <ctype.h>
@@ -10,6 +11,11 @@
 
 #define SERV_PORT 8888
 #define MAXLEN 8192
+
+/*
+ * 回收子进程回调函数
+ */
+void child_collect(int no);
 
 /*
  * 高并发服务器-多进程版本
@@ -37,6 +43,7 @@ main(
 	lfd = Socket(AF_INET, SOCK_STREAM, 0);
 
 	//服务器地址初始化
+	bzero(&serv_addr, sizeof(serv_addr));	//清空操作
 	serv_addr.sin_family = AF_INET;	//协议
 	serv_addr.sin_port = htons(SERV_PORT);	//端口号
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);	//IP地址
@@ -66,6 +73,9 @@ main(
 				if(0 == n) {
 					printf("The client side has been closed.\n");
 					break;
+				} else if(-1 == n) {
+					perror("read error: ");
+					exit(-1);
 				}
 
 				printf("Recevied from %s:%d\n",
@@ -87,6 +97,8 @@ main(
 		}
 		else if(pid > 0){	//主进程主要负责回收子进程资源
 			Close(cfd);
+			//注册信号完成子进程回收
+			signal(SIGCHLD, child_collect);
 		}
 		else {
 			perror("fork error: ");
@@ -94,4 +106,13 @@ main(
 		}
 	}
 	return 0;
+}
+
+void
+child_collect(
+		int no /*捕捉到的信号编号*/
+		)
+{
+	while(waitpid(0, NULL, WNOHANG) > 0);
+	return ;
 }
