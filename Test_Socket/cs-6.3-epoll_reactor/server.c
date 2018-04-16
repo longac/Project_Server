@@ -78,10 +78,28 @@ main(int argc, const char* argv[])
 	struct epoll_event events[MAX_EVENTS + 1];	//本地存放满足事件的文件描述符数组
 
 	int i = 0;
+	int checkpos = 0;
 
 	printf("server running at port : %d\n", port);
 	while(1) {
 		/*超时验证*/
+		long now = time(NULL);
+		for(i = 0; i < 100; ++i, checkpos++) {
+			if(MAX_EVENTS == checkpos) {
+				checkpos = 0;
+			}
+			if(1 != g_events[checkpos].status) {
+				continue;
+			}
+
+			long duration = now - g_events[checkpos].last_active;
+
+			if(duration >= 5) {
+				close(g_events[checkpos].fd);
+				printf("[fd : %d] timeout\n", g_events[checkpos].fd);
+				eventDel(&g_events[checkpos], g_efd);
+			}
+		}
 
 		/*监听红黑树的结点，将满足事件的文件描述符添加到events数组中, 阻塞时间为1秒，没有事件，返回0*/
 		int nReady = epoll_wait(g_efd, events, MAX_EVENTS + 1, 1000);
